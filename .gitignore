@@ -1,0 +1,8 @@
+/.idea
+/.venv
+datasets/fer2013/checkpoints
+datasets/fer2013/outputPath
+*.pyc
+*.DS_Store
+*.csv
+*.hdf5
