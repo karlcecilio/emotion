@@ -71,6 +71,9 @@ if args["model"] is None:
     # -------------------- 基线模型 --------------------
     if args["model_type"] == "simple_cnn":
         model = SimpleCNN.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+        print("\n=== simple_cnn Model Summary ===")
+        model.summary()
+        print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-3)
         model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
@@ -90,6 +93,9 @@ if args["model"] is None:
 
     elif args["model_type"] == "emotion_vggnet":
         model = EmotionVGGNet.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+        print("\n=== EmotionVGGNet Model Summary ===")
+        model.summary()
+        print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-2)
         model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
@@ -109,6 +115,9 @@ if args["model"] is None:
 
     elif args["model_type"] == "mini_xception":
         model = MiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+        print("\n=== mini_xception Model Summary ===")
+        model.summary()
+        print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-3)
         model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
@@ -259,23 +268,121 @@ if args["model"] is None:
         valGen.close()
 
     # -------------------- 第三次优化：中等容量模型 + 标签平滑 + MixUp + 余弦退火 --------------------
-    elif args["model_type"] == "mini_xception_optimized3":
-        from pyimage.model.medium_mini_xception import MediumMiniXception
+    # elif args["model_type"] == "mini_xception_optimized3":
+    #     from pyimage.model.medium_mini_xception import MediumMiniXception
+    #
+    #     trainGen.close()
+    #     valGen.close()
+    #
+    #     # 温和数据增强（无亮度变化，避免破坏小图）
+    #     trainAug = ImageDataGenerator(
+    #         rotation_range=10,
+    #         width_shift_range=0.05,
+    #         height_shift_range=0.05,
+    #         zoom_range=0.1,
+    #         horizontal_flip=True,
+    #         rescale=1./255,
+    #         fill_mode='nearest'
+    #     )
+    #     valAug = ImageDataGenerator(rescale=1./255)
+    #     iap = ImageToArrayPreprocessor()
+    #
+    #     trainGen = HDF5DatasetGenerator(config.TRAIN_HDF5, config.BATCH_SIZE,
+    #                                     aug=trainAug, preprocessor=iap, classes=config.NUM_CLASSES)
+    #     valGen = HDF5DatasetGenerator(config.VAL_HDF5, config.BATCH_SIZE,
+    #                                   aug=valAug, preprocessor=iap, classes=config.NUM_CLASSES)
+    #
+    #     model = MediumMiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+    #     print("\n=== Model Summary ===")
+    #     model.summary()
+    #     print(f"Total parameters: {model.count_params():,}\n")
+    #
+    #     # 类别权重
+    #     with h5py.File(config.TRAIN_HDF5, 'r') as f:
+    #         train_labels = f['labels'][:]
+    #     classes = np.unique(train_labels)
+    #     class_weights = compute_class_weight('balanced', classes=classes, y=train_labels)
+    #     class_weight_dict = dict(enumerate(class_weights))
+    #     print("[INFO] Class weights:", class_weight_dict)
+    #
+    #     class_weight_tensor = tf.constant([class_weight_dict[i] for i in range(config.NUM_CLASSES)], dtype=tf.float32)
+    #     smooth_factor = 0.1
+    #
+    #     def weighted_smooth_cce(y_true, y_pred):
+    #         num_classes = tf.shape(y_true)[-1]
+    #         y_true_smooth = y_true * (1 - smooth_factor) + (smooth_factor / tf.cast(num_classes, tf.float32))
+    #         y_true_int = tf.argmax(y_true, axis=1)
+    #         weights = tf.gather(class_weight_tensor, y_true_int)
+    #         cce = CategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)(y_true_smooth, y_pred)
+    #         return tf.reduce_mean(cce * weights)
+    #
+    #     opt = Adam(learning_rate=0.001)
+    #     model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy'])
+    #
+    #     # 余弦退火学习率
+    #     total_epochs = 100
+    #     def cosine_decay(epoch):
+    #         lr = 0.001 * (1 + math.cos(math.pi * epoch / total_epochs)) / 2
+    #         return max(lr, 1e-6)
+    #     lr_scheduler = LearningRateScheduler(cosine_decay, verbose=1)
+    #     early_stop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True, verbose=1)
+    #
+    #     # MixUp 生成器
+    #     def mixup_generator(gen, alpha=0.2):
+    #         while True:
+    #             images, labels = next(gen)
+    #             batch_size = images.shape[0]  # 获取当前批次实际大小
+    #             indices = np.random.permutation(batch_size)
+    #             mixed_images = []
+    #             mixed_labels = []
+    #             for i in range(batch_size):
+    #                 lam = np.random.beta(alpha, alpha)
+    #                 j = indices[i]
+    #                 mixed_img = lam * images[i] + (1 - lam) * images[j]
+    #                 mixed_label = lam * labels[i] + (1 - lam) * labels[j]
+    #                 mixed_images.append(mixed_img)
+    #                 mixed_labels.append(mixed_label)
+    #             yield np.array(mixed_images), np.array(mixed_labels)
+    #
+    #     callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
+    #     callbacks.extend([lr_scheduler, early_stop])
+    #
+    #     history = model.fit(
+    #         mixup_generator(trainGen.generator()),
+    #         steps_per_epoch=trainGen.numImages // config.BATCH_SIZE,
+    #         validation_data=valGen.generator(),
+    #         validation_steps=valGen.numImages // config.BATCH_SIZE,
+    #         callbacks=callbacks,
+    #         epochs=total_epochs,
+    #         initial_epoch=start_epoch,
+    #         verbose=1,
+    #     )
+    #
+    #     val_acc = history.history['val_accuracy']
+    #     best_epoch = np.argmax(val_acc) + 1
+    #     best_val_acc = val_acc[best_epoch - 1]
+    #     print(f"[INFO] Best epoch: {best_epoch}, best val_accuracy: {best_val_acc:.4f}")
+    #     best_model_path = os.path.join(args["checkpoints"], f"mini_xception_optimized3_best_epoch_{best_epoch}.hdf5")
+    #     model.save(best_model_path)
+    #     trainGen.close()
+    #     valGen.close()
+    elif args["model_type"] == "mini_xception_final":
+        from pyimage.model.final_mini_xception import FinalMiniXception
 
         trainGen.close()
         valGen.close()
 
-        # 温和数据增强（无亮度变化，避免破坏小图）
+        # 温和数据增强（无亮度变化）
         trainAug = ImageDataGenerator(
             rotation_range=10,
             width_shift_range=0.05,
             height_shift_range=0.05,
             zoom_range=0.1,
             horizontal_flip=True,
-            rescale=1./255,
+            rescale=1. / 255,
             fill_mode='nearest'
         )
-        valAug = ImageDataGenerator(rescale=1./255)
+        valAug = ImageDataGenerator(rescale=1. / 255)
         iap = ImageToArrayPreprocessor()
 
         trainGen = HDF5DatasetGenerator(config.TRAIN_HDF5, config.BATCH_SIZE,
@@ -283,7 +390,7 @@ if args["model"] is None:
         valGen = HDF5DatasetGenerator(config.VAL_HDF5, config.BATCH_SIZE,
                                       aug=valAug, preprocessor=iap, classes=config.NUM_CLASSES)
 
-        model = MediumMiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+        model = FinalMiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
         print("\n=== Model Summary ===")
         model.summary()
         print(f"Total parameters: {model.count_params():,}\n")
@@ -299,6 +406,7 @@ if args["model"] is None:
         class_weight_tensor = tf.constant([class_weight_dict[i] for i in range(config.NUM_CLASSES)], dtype=tf.float32)
         smooth_factor = 0.1
 
+
         def weighted_smooth_cce(y_true, y_pred):
             num_classes = tf.shape(y_true)[-1]
             y_true_smooth = y_true * (1 - smooth_factor) + (smooth_factor / tf.cast(num_classes, tf.float32))
@@ -307,22 +415,33 @@ if args["model"] is None:
             cce = CategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)(y_true_smooth, y_pred)
             return tf.reduce_mean(cce * weights)
 
-        opt = Adam(learning_rate=0.001)
+
+        # 优化器：Adam 增加权重衰减
+        from tensorflow.keras.optimizers import AdamW
+
+        opt = AdamW(learning_rate=0.001, weight_decay=1e-4)
         model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy'])
 
-        # 余弦退火学习率
-        total_epochs = 100
+        # 余弦退火学习率（120 轮）
+        total_epochs = 120
+
+
         def cosine_decay(epoch):
             lr = 0.001 * (1 + math.cos(math.pi * epoch / total_epochs)) / 2
             return max(lr, 1e-6)
-        lr_scheduler = LearningRateScheduler(cosine_decay, verbose=1)
-        early_stop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True, verbose=1)
 
-        # MixUp 生成器
-        def mixup_generator(gen, alpha=0.2):
+
+        lr_scheduler = LearningRateScheduler(cosine_decay, verbose=1)
+
+        # 早停 patience=20
+        early_stop = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True, verbose=1)
+
+
+        # MixUp 生成器（alpha=0.1，降低混合强度）
+        def mixup_generator(gen, alpha=0.1):
             while True:
                 images, labels = next(gen)
-                batch_size = images.shape[0]  # 获取当前批次实际大小
+                batch_size = images.shape[0]
                 indices = np.random.permutation(batch_size)
                 mixed_images = []
                 mixed_labels = []
@@ -334,6 +453,7 @@ if args["model"] is None:
                     mixed_images.append(mixed_img)
                     mixed_labels.append(mixed_label)
                 yield np.array(mixed_images), np.array(mixed_labels)
+
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         callbacks.extend([lr_scheduler, early_stop])
@@ -353,11 +473,11 @@ if args["model"] is None:
         best_epoch = np.argmax(val_acc) + 1
         best_val_acc = val_acc[best_epoch - 1]
         print(f"[INFO] Best epoch: {best_epoch}, best val_accuracy: {best_val_acc:.4f}")
-        best_model_path = os.path.join(args["checkpoints"], f"mini_xception_optimized3_best_epoch_{best_epoch}.hdf5")
+        best_model_path = os.path.join(args["checkpoints"], f"mini_xception_final_best_epoch_{best_epoch}.hdf5")
         model.save(best_model_path)
         trainGen.close()
         valGen.close()
-
+        sys.exit(0)
     else:
         raise ValueError("Unsupported model type")
 

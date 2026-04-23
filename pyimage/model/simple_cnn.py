@@ -14,3 +14,4 @@ class SimpleCNN:
         model.add(Dropout(0.5))
         model.add(Dense(classes, activation='softmax'))
         return model
+
