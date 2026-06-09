@@ -36,7 +36,7 @@ ap.add_argument("-m", "--model", type=str, help="path to existing model (for res
 ap.add_argument("-s", "--start-epoch", type=int, default=0, help="epoch to restart training at")
 ap.add_argument("-t", "--model_type", type=str, default="emotion_vggnet",
                 choices=["simple_cnn", "emotion_vggnet", "mini_xception", "mobilenetv2",
-                         "mini_xception_optimized1", "mini_xception_optimized2", "mini_xception_optimized3"],
+                         "mini_xception_optimized1", "mini_xception_optimized2", "mini_xception_optimized3","mini_xception_final"],
                 help="type of model to use")
 args = vars(ap.parse_args())
 
@@ -266,106 +266,6 @@ if args["model"] is None:
         model.save(best_model_path)
         trainGen.close()
         valGen.close()
-
-    # -------------------- 第三次优化：中等容量模型 + 标签平滑 + MixUp + 余弦退火 --------------------
-    # elif args["model_type"] == "mini_xception_optimized3":
-    #     from pyimage.model.medium_mini_xception import MediumMiniXception
-    #
-    #     trainGen.close()
-    #     valGen.close()
-    #
-    #     # 温和数据增强（无亮度变化，避免破坏小图）
-    #     trainAug = ImageDataGenerator(
-    #         rotation_range=10,
-    #         width_shift_range=0.05,
-    #         height_shift_range=0.05,
-    #         zoom_range=0.1,
-    #         horizontal_flip=True,
-    #         rescale=1./255,
-    #         fill_mode='nearest'
-    #     )
-    #     valAug = ImageDataGenerator(rescale=1./255)
-    #     iap = ImageToArrayPreprocessor()
-    #
-    #     trainGen = HDF5DatasetGenerator(config.TRAIN_HDF5, config.BATCH_SIZE,
-    #                                     aug=trainAug, preprocessor=iap, classes=config.NUM_CLASSES)
-    #     valGen = HDF5DatasetGenerator(config.VAL_HDF5, config.BATCH_SIZE,
-    #                                   aug=valAug, preprocessor=iap, classes=config.NUM_CLASSES)
-    #
-    #     model = MediumMiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
-    #     print("\n=== Model Summary ===")
-    #     model.summary()
-    #     print(f"Total parameters: {model.count_params():,}\n")
-    #
-    #     # 类别权重
-    #     with h5py.File(config.TRAIN_HDF5, 'r') as f:
-    #         train_labels = f['labels'][:]
-    #     classes = np.unique(train_labels)
-    #     class_weights = compute_class_weight('balanced', classes=classes, y=train_labels)
-    #     class_weight_dict = dict(enumerate(class_weights))
-    #     print("[INFO] Class weights:", class_weight_dict)
-    #
-    #     class_weight_tensor = tf.constant([class_weight_dict[i] for i in range(config.NUM_CLASSES)], dtype=tf.float32)
-    #     smooth_factor = 0.1
-    #
-    #     def weighted_smooth_cce(y_true, y_pred):
-    #         num_classes = tf.shape(y_true)[-1]
-    #         y_true_smooth = y_true * (1 - smooth_factor) + (smooth_factor / tf.cast(num_classes, tf.float32))
-    #         y_true_int = tf.argmax(y_true, axis=1)
-    #         weights = tf.gather(class_weight_tensor, y_true_int)
-    #         cce = CategoricalCrossentropy(reduction=tf.keras.losses.Reduction.NONE)(y_true_smooth, y_pred)
-    #         return tf.reduce_mean(cce * weights)
-    #
-    #     opt = Adam(learning_rate=0.001)
-    #     model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy'])
-    #
-    #     # 余弦退火学习率
-    #     total_epochs = 100
-    #     def cosine_decay(epoch):
-    #         lr = 0.001 * (1 + math.cos(math.pi * epoch / total_epochs)) / 2
-    #         return max(lr, 1e-6)
-    #     lr_scheduler = LearningRateScheduler(cosine_decay, verbose=1)
-    #     early_stop = EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True, verbose=1)
-    #
-    #     # MixUp 生成器
-    #     def mixup_generator(gen, alpha=0.2):
-    #         while True:
-    #             images, labels = next(gen)
-    #             batch_size = images.shape[0]  # 获取当前批次实际大小
-    #             indices = np.random.permutation(batch_size)
-    #             mixed_images = []
-    #             mixed_labels = []
-    #             for i in range(batch_size):
-    #                 lam = np.random.beta(alpha, alpha)
-    #                 j = indices[i]
-    #                 mixed_img = lam * images[i] + (1 - lam) * images[j]
-    #                 mixed_label = lam * labels[i] + (1 - lam) * labels[j]
-    #                 mixed_images.append(mixed_img)
-    #                 mixed_labels.append(mixed_label)
-    #             yield np.array(mixed_images), np.array(mixed_labels)
-    #
-    #     callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
-    #     callbacks.extend([lr_scheduler, early_stop])
-    #
-    #     history = model.fit(
-    #         mixup_generator(trainGen.generator()),
-    #         steps_per_epoch=trainGen.numImages // config.BATCH_SIZE,
-    #         validation_data=valGen.generator(),
-    #         validation_steps=valGen.numImages // config.BATCH_SIZE,
-    #         callbacks=callbacks,
-    #         epochs=total_epochs,
-    #         initial_epoch=start_epoch,
-    #         verbose=1,
-    #     )
-    #
-    #     val_acc = history.history['val_accuracy']
-    #     best_epoch = np.argmax(val_acc) + 1
-    #     best_val_acc = val_acc[best_epoch - 1]
-    #     print(f"[INFO] Best epoch: {best_epoch}, best val_accuracy: {best_val_acc:.4f}")
-    #     best_model_path = os.path.join(args["checkpoints"], f"mini_xception_optimized3_best_epoch_{best_epoch}.hdf5")
-    #     model.save(best_model_path)
-    #     trainGen.close()
-    #     valGen.close()
     elif args["model_type"] == "mini_xception_final":
         from pyimage.model.final_mini_xception import FinalMiniXception
 
