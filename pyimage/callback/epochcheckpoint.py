@@ -4,7 +4,7 @@ from tensorflow.keras.callbacks import Callback
 
 
 class EpochCheckpoint(Callback):
-    def __init__(self, outputPath, every=10, startAt=0,model_type = "test"):
+    def __init__(self, outputPath, every=20, startAt=0,model_type = "test"):
         """
         每个 epoch 结束后保存模型权重
 
