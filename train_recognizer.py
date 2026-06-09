@@ -3,9 +3,10 @@
 #   python train_recognizer.py --checkpoints ./datasets/fer2013/checkpoints --model_type simple_cnn
 #   python train_recognizer.py --checkpoints ./datasets/fer2013/checkpoints --model_type mobilenetv2
 #   python train_recognizer.py --checkpoints ./datasets/fer2013/checkpoints --model_type mini_xception_optimized3
+
 import matplotlib
 matplotlib.use('Agg')
-from tensorflow.keras import backend as K
+
 from config import emotion_config as config
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import load_model
@@ -40,16 +41,6 @@ ap.add_argument("-t", "--model_type", type=str, default="emotion_vggnet",
 args = vars(ap.parse_args())
 
 # ======================== 辅助函数 ========================
-def f1_score(y_true, y_pred):
-    y_true = K.argmax(y_true, axis=1)
-    y_pred = K.argmax(y_pred, axis=1)
-    true_pos = K.sum(K.cast(y_true * y_pred, 'float32'))
-    possible_pos = K.sum(K.cast(y_true, 'float32'))
-    predicted_pos = K.sum(K.cast(y_pred, 'float32'))
-    precision = true_pos / (predicted_pos + K.epsilon())
-    recall = true_pos / (possible_pos + K.epsilon())
-    return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
-
 def make_basic_callbacks(model_type, checkpoints, start_epoch, output_path):
     """生成基础回调（EpochCheckpoint + TrainingMonitor）"""
     figPath = os.path.join(output_path, f"{model_type}_training.png")
@@ -84,7 +75,7 @@ if args["model"] is None:
         model.summary()
         print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         total_epochs = start_epoch + 60
         model.fit(
@@ -106,7 +97,7 @@ if args["model"] is None:
         model.summary()
         print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-2)
-        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         total_epochs = start_epoch + 60
         model.fit(
@@ -128,7 +119,7 @@ if args["model"] is None:
         model.summary()
         print(f"Total parameters: {model.count_params():,}\n")
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         total_epochs = start_epoch + 60
         model.fit(
@@ -144,6 +135,24 @@ if args["model"] is None:
         trainGen.close()
         valGen.close()
 
+    elif args["model_type"] == "mobilenetv2":
+        model = MobileNetV2FER.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
+        opt = Adam(learning_rate=1e-3)
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+        callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
+        total_epochs = start_epoch + 60
+        model.fit(
+            trainGen.generator(),
+            steps_per_epoch=trainGen.numImages // config.BATCH_SIZE,
+            validation_data=valGen.generator(),
+            validation_steps=valGen.numImages // config.BATCH_SIZE,
+            callbacks=callbacks,
+            epochs=total_epochs,
+            initial_epoch=start_epoch,
+            verbose=1,
+        )
+        trainGen.close()
+        valGen.close()
 
     # -------------------- 第一次优化 --------------------
     elif args["model_type"] == "mini_xception_optimized1":
@@ -165,7 +174,7 @@ if args["model"] is None:
             return tf.reduce_mean(cce * weights)
 
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy'])
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
@@ -231,7 +240,7 @@ if args["model"] is None:
             return tf.reduce_mean(cce * weights)
 
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy'])
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
@@ -311,7 +320,7 @@ if args["model"] is None:
         from tensorflow.keras.optimizers import AdamW
 
         opt = AdamW(learning_rate=0.001, weight_decay=1e-4)
-        model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy',f1_score])
+        model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy'])
 
         # 余弦退火学习率（120 轮）
         total_epochs = 120
