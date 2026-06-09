@@ -165,7 +165,7 @@ if args["model"] is None:
             return tf.reduce_mean(cce * weights)
 
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy'])
+        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy',f1_score])
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
@@ -231,7 +231,7 @@ if args["model"] is None:
             return tf.reduce_mean(cce * weights)
 
         opt = Adam(learning_rate=1e-3)
-        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy'])
+        model.compile(loss=weighted_cce, optimizer=opt, metrics=['accuracy',f1_score])
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
@@ -311,7 +311,7 @@ if args["model"] is None:
         from tensorflow.keras.optimizers import AdamW
 
         opt = AdamW(learning_rate=0.001, weight_decay=1e-4)
-        model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy'])
+        model.compile(loss=weighted_smooth_cce, optimizer=opt, metrics=['accuracy',f1_score])
 
         # 余弦退火学习率（120 轮）
         total_epochs = 120
