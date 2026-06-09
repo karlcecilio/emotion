@@ -178,7 +178,7 @@ if args["model"] is None:
 
         callbacks = make_basic_callbacks(args["model_type"], args["checkpoints"], start_epoch, config.OUTPUT_PATH)
         lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
-        early_stop = EarlyStopping(monitor='val_loss', patience=12, restore_best_weights=True, verbose=1)
+        early_stop = EarlyStopping(monitor='val_accuracy', mode='max', patience=15, restore_best_weights=True, verbose=1)
         callbacks.extend([lr_scheduler, early_stop])
 
         total_epochs = start_epoch + 80
@@ -291,7 +291,7 @@ if args["model"] is None:
                                       aug=valAug, preprocessor=iap, classes=config.NUM_CLASSES)
 
         model = FinalMiniXception.build(width=48, height=48, depth=1, classes=config.NUM_CLASSES)
-        print("\n=== Model Summary ===")
+        print("\n=== Model mini_xception_final Summary ===")
         model.summary()
         print(f"Total parameters: {model.count_params():,}\n")
 

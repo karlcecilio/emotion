@@ -1,5 +1,5 @@
 # USAGE
-# python emotion_detector.py --cascade haarcascade_frontalface_default.xml --model ./datasets/fer2013/checkpoints/epoch_15.hdf5 --video ./datasets/video/test.mp4
+# python emotion_detector.py --cascade haarcascade_frontalface_default.xml --model ./datasets/fer2013/checkpoints/mini_xception_final_best_epoch_41.hdf5 --video ./datasets/video/test.mp4
 
 from tensorflow.keras.utils import img_to_array
 from tensorflow.keras.models import load_model
@@ -7,6 +7,17 @@ import numpy as np
 import argparse
 import imutils
 import cv2
+import tensorflow as tf
+
+# ---------- 自定义损失函数（与训练时一致，用于加载模型）----------
+def weighted_smooth_cce(y_true, y_pred):
+    # 简化版：直接使用交叉熵（因为加载模型时不需要严格计算梯度）
+    # 但为了与训练时一致，保留同样的函数体（若想精确复现，需复制训练代码中的完整定义）
+    # 注意：这里我们只需要一个可调用对象让 Keras 能找到它，实际推理时不会计算损失。
+    return tf.reduce_mean(tf.keras.losses.categorical_crossentropy(y_true, y_pred))
+
+# 如果需要 AdamW 优化器
+from tensorflow.keras.optimizers import AdamW
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-c", "--cascade", required=True, help="path to face cascade")
@@ -16,7 +27,15 @@ args = vars(ap.parse_args())
 
 detector = cv2.CascadeClassifier(args["cascade"])
 print("[INFO] loading model...")
-model = load_model(args["model"],safe_mode=False)
+# 加载模型时指定自定义对象
+model = load_model(
+    args["model"],
+    custom_objects={
+        'weighted_smooth_cce': weighted_smooth_cce,
+        'AdamW': AdamW
+    },
+    safe_mode=False
+)
 
 EMOTIONS = ["angry", "fear", "happy", "sad", "surprise", "neutral"]
 
@@ -28,29 +47,25 @@ while True:
         break
 
     # ---------- 人脸检测部分（采用优化后的参数 + 几何过滤，保持检测稳定） ----------
-    frame = imutils.resize(frame, width=300)  # 检测用300宽，稳定性好
+    frame = imutils.resize(frame, width=300)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # 用于显示的画板（高分辨率，保证文字清晰）
-    canvas = np.zeros((420, 600, 3), dtype="uint8")  # 宽度600，每个情绪条60高
+    canvas = np.zeros((420, 600, 3), dtype="uint8")
     frameClone = frame.copy()
 
-    # 优化后的 detectMultiScale 参数
     rects = detector.detectMultiScale(gray,
-                                      scaleFactor=1.05,  # 缩小步长，检测更精细
-                                      minNeighbors=8,  # 提高邻居数，过滤虚假人脸
-                                      minSize=(60, 60),  # 提高最小尺寸，避免小噪点
+                                      scaleFactor=1.05,
+                                      minNeighbors=8,
+                                      minSize=(60, 60),
                                       flags=cv2.CASCADE_SCALE_IMAGE)
 
     if len(rects) > 0:
-        # 几何过滤：宽高比（正面人脸应在0.8~1.2之间）
+        # 几何过滤：宽高比
         rects = [r for r in rects if 0.8 <= r[2] / r[3] <= 1.2]
-        # 几何过滤：面积过滤（不能太小或太大，相对于画面）
         area_frame = gray.shape[0] * gray.shape[1]
         rects = [r for r in rects if 0.005 < (r[2] * r[3]) / area_frame < 0.4]
 
         if len(rects) > 0:
-            # 取面积最大的人脸（原始逻辑）
             rect = sorted(rects, key=lambda x: x[2] * x[3], reverse=True)[0]
             (fx, fy, fw, fh) = rect
 
@@ -61,10 +76,10 @@ while True:
             roi = np.expand_dims(roi, axis=0)
 
             preds = model.predict(roi)[0]
-            print("[INFO] ----",preds.argmax(), preds)
+            print("[INFO] ----", preds.argmax(), preds)
             label = EMOTIONS[preds.argmax()]
 
-            # ---------- 绘制概率条（高清晰）----------
+            # 绘制概率条
             for i, (emotion, prob) in enumerate(zip(EMOTIONS, preds)):
                 text = "{}: {:.2f}%".format(emotion, prob * 100)
                 w = int(prob * 600)
@@ -74,12 +89,10 @@ while True:
                 cv2.putText(canvas, text, (10, y_top + 38), cv2.FONT_HERSHEY_SIMPLEX,
                             1.0, (255, 255, 255), 2)
 
-            # 在原始帧（300宽）上画人脸框和标签
             cv2.putText(frameClone, label, (fx, fy - 10), cv2.FONT_HERSHEY_SIMPLEX,
                         0.8, (0, 0, 255), 2)
             cv2.rectangle(frameClone, (fx, fy), (fx + fw, fy + fh), (0, 0, 255), 2)
 
-    # ---------- 显示部分：将视频帧放大到600宽，与画板拼接 ----------
     h, w = frameClone.shape[:2]
     frame_large = cv2.resize(frameClone, (600, int(600 * h / w)))
     combined = np.vstack([frame_large, canvas])
