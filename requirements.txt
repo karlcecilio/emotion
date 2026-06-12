@@ -1,0 +1,14 @@
+# Core dependencies for emotion recognition project
+# Python 3.9+ recommended
+
+tensorflow==2.15.0
+# For Apple Silicon (M1/M2) use: tensorflow-macos==2.15.0
+
+opencv-python==4.13.0.92
+imutils==0.5.4
+numpy==1.26.4
+h5py==3.16.0
+scikit-learn==1.8.0
+matplotlib==3.10.8
+seaborn==0.13.2
+pillow==12.2.0
