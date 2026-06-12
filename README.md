@@ -47,7 +47,7 @@ This facial expression recognition system, based on the FER2013 dataset, support
     ```bash
     python build_dataset.py
     This script will generate three files: train.hdf5, val.hdf5, and test.hdf5, and save them in datasets/fer2013/hdf5/.
-## 模型训练
+## Model training
 | Model type | Explanation                |
 |----------|----------------------------|
 | `simple_cnn` | Lightweight CNN, baseline model              |
